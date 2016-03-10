@@ -3,63 +3,50 @@ require "bootstrap_pagination/version"
 module BootstrapPagination
   # Contains functionality shared by all renderer classes.
   module BootstrapRenderer
-    ELLIPSIS = "&hellip;"
-
     def to_html
-      list_items = pagination.map do |item|
-        case item
-          when Fixnum
-            page_number(item)
-          else
-            send(item)
-        end
+      html = pagination.map do |item|
+        item.is_a?(Fixnum) ?
+          page_number(item) :
+          send(item)
       end.join(@options[:link_separator])
 
-      tag("ul", list_items, class: ul_class)
-    end
+      html = html_container(html) if @options[:container]
 
-    def container_attributes
-      super.except(*[:link_options])
+      tag("nav", tag("ul", html, class: @options[:class]))
     end
 
     protected
 
-    def page_number(page)
-      link_options = @options[:link_options] || {}
+    def page_item(text, url, link_status = nil)
+      text = text.to_s + tag(:span, "(current)", class: "sr-only") if link_status == "active"
+      link_tag = link_status.nil? ? link(text, url, class: "page-link", rel: text) : tag(:span, text, class: "page-link")
 
-      if page == current_page
-        tag("li", tag("span", page), class: "active")
-      else
-        tag("li", link(page, page, link_options.merge(rel: rel_value(page))))
-      end
+      tag(:li, link_tag, class: "page-item #{link_status}")
     end
 
-    def previous_or_next_page(page, text, classname)
-      link_options = @options[:link_options] || {}
-
-      if page
-        tag("li", link(text, page, link_options), class: classname)
-      else
-        tag("li", tag("span", text), class: "%s disabled" % classname)
-      end
+    def page_number(page)
+      link_status = "active" if page == current_page
+      page_item(page, page, link_status)
     end
 
     def gap
-      tag("li", tag("span", ELLIPSIS), class: "disabled")
+      text = @template.will_paginate_translate(:page_gap) { '&hellip;' }
+      page_item(text, nil, "disabled")
     end
 
     def previous_page
       num = @collection.current_page > 1 && @collection.current_page - 1
-      previous_or_next_page(num, @options[:previous_label], "prev")
+      previous_or_next_page(num, @options[:previous_label], "Previous")
     end
 
     def next_page
-      num = @collection.current_page < @collection.total_pages && @collection.current_page + 1
-      previous_or_next_page(num, @options[:next_label], "next")
+      num = @collection.current_page < total_pages && @collection.current_page + 1
+      previous_or_next_page(num, @options[:next_label], "Next")
     end
 
-    def ul_class
-      ["pagination", @options[:class]].compact.join(" ")
+    def previous_or_next_page(page, text, aria_label)
+      link_status = "disabled" unless page
+      page_item(text, page, link_status)
     end
   end
 end
